@@ -1,7 +1,7 @@
 defmodule Assessment do
-  @moduledoc false
-
-  use Agent
+  @moduledoc """
+  A checkout system that adds products to a cart and displays the total price.
+  """
 
   alias Assessment.{PricingRules, Items}
 
@@ -94,7 +94,11 @@ defmodule Assessment do
 end
 
 defmodule Assessment.Items do
-  use Agent
+  @moduledoc """
+  Using Agent to keep state from the input.
+  Also tried ETS and GenServer as well.
+  All works, but Agent is just a quicker implementation
+  """
 
   def empty_basket(), do: Agent.start_link(fn -> %{} end, name: :basket)
 
