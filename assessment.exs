@@ -3,7 +3,8 @@ defmodule Assessment do
   A checkout system that adds products to a cart and displays the total price.
   """
 
-  alias Assessment.{PricingRules, Items}
+  alias Assessment.Items
+  alias Assessment.PricingRules
 
   def run() do
     Items.empty_basket()
@@ -33,8 +34,7 @@ defmodule Assessment do
   end
 
   def total_price(map_of_counted_items) do
-    map_of_counted_items
-    |> Enum.reduce(0, fn {key, value}, acc -> count_price(key, value, acc) end)
+    Enum.reduce(map_of_counted_items, 0, fn {key, value}, acc -> count_price(key, value, acc) end)
   end
 
   defp count_price(:Green_Tea, value, acc), do: PricingRules.ceo(value) + acc
@@ -73,24 +73,17 @@ defmodule Assessment do
 
   # HELPERS functions
   defp ask_to_collect_items(question \\ "Something else?: ") do
-    answer =
-      IO.gets(question)
-      |> String.trim()
-
-    collect_answers(answer)
+    question
+    |> IO.gets()
+    |> String.trim()
+    |> collect_answers()
   end
 
-  defp red_color() do
-    IO.ANSI.red()
-  end
+  defp red_color(), do: IO.ANSI.red()
 
-  defp yellow_color() do
-    IO.ANSI.yellow()
-  end
+  defp yellow_color(), do: IO.ANSI.yellow()
 
-  defp reset_color() do
-    IO.ANSI.reset()
-  end
+  defp reset_color(), do: IO.ANSI.reset()
 end
 
 defmodule Assessment.Items do
