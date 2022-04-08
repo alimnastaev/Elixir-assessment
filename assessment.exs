@@ -25,7 +25,7 @@ defmodule Assessment do
     Items.remove()
   end
 
-  # HELPERS functions
+  # HELPER functions
   defp ask_to_collect_items(question \\ "\nSomething else?: ") do
     question
     |> IO.gets()
@@ -65,9 +65,7 @@ defmodule Assessment do
   end
 
   defp red_color(), do: IO.ANSI.red()
-
   defp yellow_color(), do: IO.ANSI.yellow()
-
   defp reset_color(), do: IO.ANSI.reset()
 end
 
@@ -123,7 +121,6 @@ defmodule Assessment.Items do
   end
 
   def checkout(), do: Agent.get(:basket, & &1.total_price)
-
   def remove(), do: Agent.stop(:basket)
 
   defp count_price(:green_tea, value), do: PricingRules.ceo(value)
@@ -145,7 +142,9 @@ defmodule Assessment.PricingRules do
   @coffee_price 11.23
   @coffee_discount_price @coffee_price / 3
 
-  # buy-one-get-one-free
+  @doc """
+  buy-one-get-one-free
+  """
   def ceo(green_teas) when Integer.is_even(green_teas) do
     green_teas / 2 * @green_tea
   end
@@ -156,11 +155,15 @@ defmodule Assessment.PricingRules do
     (green_teas - 1) / 2 * @green_tea + @green_tea
   end
 
-  # buy 3 or more strawberries, the price should drop to £4.50
+  @doc """
+  buy 3 or more strawberries, the price should drop to £4.50
+  """
   def coo(strawberries) when strawberries >= 3, do: strawberries * @strawberries_discount_price
   def coo(strawberries), do: strawberries * @strawberries_price
 
-  # buy 3 or more coffees for two thirds of the original price
+  @doc """
+  buy 3 or more coffees for two thirds of the original price
+  """
   def cto(coffees) when coffees >= 3, do: coffees * @coffee_discount_price
   def cto(coffees), do: coffees * @coffee_price
 end
