@@ -4,7 +4,6 @@ defmodule Assessment do
   """
 
   alias Assessment.Items
-  alias Assessment.PricingRules
 
   def run() do
     Items.empty_basket()
@@ -19,64 +18,50 @@ defmodule Assessment do
     Just specify item's number! \n
     })
 
-    map_of_counted_items = ask_to_collect_items("What would you like to buy?: ")
-
-    result = total_price(map_of_counted_items)
-
-    IO.puts(
-      "\nBasket: " <>
-        red_color() <> "#{inspect(Map.to_list(map_of_counted_items))}" <> reset_color()
-    )
+    result = ask_to_collect_items("What would you like to buy?: ")
 
     IO.puts("Total price expected: " <> red_color() <> "£#{result}" <> reset_color())
 
     Items.remove()
   end
 
-  def total_price(map_of_counted_items) do
-    Enum.reduce(map_of_counted_items, 0, fn {key, value}, acc -> count_price(key, value, acc) end)
+  # HELPERS functions
+  defp ask_to_collect_items(question \\ "\nSomething else?: ") do
+    question
+    |> IO.gets()
+    |> String.trim()
+    |> collect_answers()
   end
 
-  defp count_price(:Green_Tea, value, acc), do: PricingRules.ceo(value) + acc
-  defp count_price(:Strawberries, value, acc), do: PricingRules.coo(value) + acc
-  defp count_price(:Coffee, value, acc), do: PricingRules.cto(value) + acc
+  defp collect_answers("1") do
+    Items.put_in_basket(:green_tea)
+    ask_to_collect_items()
+  end
 
-  # Storing all items to use it later
-  defp collect_answers(answer) do
-    case answer do
-      "1" ->
-        Items.put_in_basket(:Green_Tea)
-        ask_to_collect_items()
+  defp collect_answers("2") do
+    Items.put_in_basket(:strawberries)
+    ask_to_collect_items()
+  end
 
-      "2" ->
-        Items.put_in_basket(:Strawberries)
-        ask_to_collect_items()
+  defp collect_answers("3") do
+    Items.put_in_basket(:coffee)
+    ask_to_collect_items()
+  end
 
-      "3" ->
-        Items.put_in_basket(:Coffee)
-        ask_to_collect_items()
+  defp collect_answers("D") do
+    IO.puts(yellow_color() <> "\n*** Thanks for your purchase! ***\n" <> IO.ANSI.reset())
 
-      "D" ->
-        IO.puts(yellow_color() <> "\n*** Thanks for your purchase! ***" <> IO.ANSI.reset())
-        Items.checkout()
+    Items.checkout()
+  end
 
-      _ ->
-        IO.puts(~s{\n Make sure to type: \n
+  defp collect_answers(_) do
+    IO.puts(~s{\n Make sure to type: \n
         1 for Green Tea
         2 for Strawberies
         3 for Coffee \n
         Don't forget, if you done with your purchuse just type D \n})
 
-        ask_to_collect_items()
-    end
-  end
-
-  # HELPERS functions
-  defp ask_to_collect_items(question \\ "Something else?: ") do
-    question
-    |> IO.gets()
-    |> String.trim()
-    |> collect_answers()
+    ask_to_collect_items()
   end
 
   defp red_color(), do: IO.ANSI.red()
@@ -90,17 +75,60 @@ defmodule Assessment.Items do
   @moduledoc """
   Using Agent to keep state from the input.
   Also tried ETS and GenServer as well.
-  All works, but Agent is just a quicker implementation
+  All work, but Agent is just a quicker implementation
   """
+
+  alias Assessment.PricingRules
 
   def empty_basket(), do: Agent.start_link(fn -> %{} end, name: :basket)
 
-  def put_in_basket(item),
-    do: Agent.update(:basket, fn map -> Map.update(map, item, 1, &(&1 + 1)) end)
+  def put_in_basket(product) do
+    Agent.update(:basket, fn basket ->
+      cond do
+        # basket is empty
+        basket == %{} ->
+          initial_price = count_price(product, 1)
 
-  def checkout(), do: Agent.get(:basket, & &1)
+          basket
+          |> Map.put(product, [1, initial_price])
+          |> Map.put(:total_price, initial_price)
+
+        # # updating existing poduct
+        is_map_key(basket, product) ->
+          [counter, existing_product_price] = basket[product]
+
+          updated_product_price = count_price(product, counter + 1)
+
+          {updated_product_price, total_price} =
+            if updated_product_price == existing_product_price do
+              {existing_product_price, basket.total_price}
+            else
+              {updated_product_price,
+               basket.total_price + (updated_product_price - existing_product_price)}
+            end
+
+          basket
+          |> Map.put(product, [counter + 1, updated_product_price])
+          |> Map.put(:total_price, total_price)
+
+        # poduct not in the basket
+        true ->
+          updated_product_price = count_price(product, 1)
+
+          basket
+          |> Map.put(product, [1, updated_product_price])
+          |> Map.put(:total_price, basket.total_price + updated_product_price)
+      end
+    end)
+  end
+
+  def checkout(), do: Agent.get(:basket, & &1.total_price)
 
   def remove(), do: Agent.stop(:basket)
+
+  defp count_price(:green_tea, value), do: PricingRules.ceo(value)
+  defp count_price(:strawberries, value), do: PricingRules.coo(value)
+  defp count_price(:coffee, value), do: PricingRules.cto(value)
 end
 
 defmodule Assessment.PricingRules do
@@ -118,30 +146,23 @@ defmodule Assessment.PricingRules do
   @coffee_discount_price @coffee_price / 3
 
   # buy-one-get-one-free
+  def ceo(green_teas) when Integer.is_even(green_teas) do
+    green_teas / 2 * @green_tea
+  end
+
+  def ceo(1 = _green_teas), do: @green_tea
+
   def ceo(green_teas) do
-    cond do
-      green_teas == 1 ->
-        @green_tea
-
-      Integer.is_even(green_teas) ->
-        green_teas / 2 * @green_tea
-
-      true ->
-        (green_teas - 1) / 2 * @green_tea + @green_tea
-    end
+    (green_teas - 1) / 2 * @green_tea + @green_tea
   end
 
   # buy 3 or more strawberries, the price should drop to £4.50
-  def coo(strawberries) do
-    if strawberries >= 3,
-      do: strawberries * @strawberries_discount_price,
-      else: strawberries * @strawberries_price
-  end
+  def coo(strawberries) when strawberries >= 3, do: strawberries * @strawberries_discount_price
+  def coo(strawberries), do: strawberries * @strawberries_price
 
   # buy 3 or more coffees for two thirds of the original price
-  def cto(coffees) do
-    if coffees >= 3, do: coffees * @coffee_discount_price, else: coffees * @coffee_price
-  end
+  def cto(coffees) when coffees >= 3, do: coffees * @coffee_discount_price
+  def cto(coffees), do: coffees * @coffee_price
 end
 
 case System.argv() do
